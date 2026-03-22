@@ -65,6 +65,24 @@ dependencies: [
 - Variable-length bit reader/writer with MSB-first packing
 - Index-based reading (no array mutation overhead)
 
+## Python Bindings
+
+This package includes **[pygorilla](pygorilla/)**, a Python wrapper powered by [ApplePy](https://github.com/jagtesh/applepy) that calls directly into the Swift-native implementation.
+
+```python
+import pygorilla
+
+compressed = pygorilla.compress(1440583200, [1440583260, 1440583320], [761.0, 727.0])
+points = pygorilla.decompress(compressed)  # [(1440583260.0, 761.0), ...]
+stats = pygorilla.compression_stats(1440583200, timestamps, values)
+```
+
+```bash
+cd pygorilla && applepy develop  # build & install into current Python env
+```
+
+See [pygorilla/README.md](pygorilla/README.md) for full API documentation.
+
 ## License
 
 BSD-3-Clause
