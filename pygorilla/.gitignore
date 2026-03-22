@@ -1,0 +1,7 @@
+*.so
+swift/.build/
+*.egg-info/
+dist/
+build/
+__pycache__/
+.DS_Store

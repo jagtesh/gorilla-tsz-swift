@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pygorilla"
+version = "0.1.0"
+description = "Python bindings for Gorilla TSZ time-series compression (Swift-native)"
+readme = "README.md"
+license = {text = "BSD-3-Clause"}
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Swift",
+]
+
+[tool.setuptools.packages.find]
+include = ["pygorilla*"]
