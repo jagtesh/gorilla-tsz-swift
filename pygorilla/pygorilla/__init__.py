@@ -6,8 +6,7 @@ import importlib
 import os
 import sys
 
-if sys.platform != "darwin":
-    raise ImportError("pygorilla only supports macOS")
+
 
 
 def _load_native():

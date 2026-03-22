@@ -13,9 +13,6 @@ class SwiftBuildExt(build_ext):
     """Custom build_ext that calls `swift build` to compile the Swift extension."""
 
     def run(self):
-        if sys.platform != "darwin":
-            raise RuntimeError("pygorilla only supports macOS")
-
         swift_dir = Path(__file__).parent / "swift"
         pkg_config_path = sysconfig.get_config_var("LIBPC") or ""
 
@@ -30,7 +27,11 @@ class SwiftBuildExt(build_ext):
         )
 
         build_dir = swift_dir / ".build" / "debug"
-        dylib = build_dir / "libPygorilla.dylib"
+        # Platform-aware library name
+        if sys.platform == "darwin":
+            dylib = build_dir / "libPygorilla.dylib"
+        else:
+            dylib = build_dir / "libPygorilla.so"
         if not dylib.exists():
             raise RuntimeError(f"Build succeeded but {dylib} not found")
 

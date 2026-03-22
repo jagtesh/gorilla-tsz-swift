@@ -4,7 +4,6 @@ import PackageDescription
 
 let package = Package(
     name: "GorillaTSZ",
-    platforms: [.macOS(.v13)],
     products: [
         .library(name: "GorillaTSZ", targets: ["GorillaTSZ"]),
     ],
