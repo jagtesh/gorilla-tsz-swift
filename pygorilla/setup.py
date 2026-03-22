@@ -35,7 +35,7 @@ class SwiftBuildExt(build_ext):
         if not dylib.exists():
             raise RuntimeError(f"Build succeeded but {dylib} not found")
 
-        dest = Path(__file__).parent / "pygorilla" / "pygorilla.so"
+        dest = Path(__file__).parent / "pygorilla" / "_native" / "pygorilla.so"
         print(f"📦 Installing {dylib.name} → {dest}")
         import shutil
         shutil.copy2(dylib, dest)

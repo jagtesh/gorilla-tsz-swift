@@ -5,16 +5,36 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pygorilla"
 version = "0.1.0"
-description = "Python bindings for Gorilla TSZ time-series compression (Swift-native)"
+description = "Fast, lossless time-series compression using Facebook's Gorilla algorithm. Swift-native performance via ApplePy."
 readme = "README.md"
 license = {text = "BSD-3-Clause"}
 requires-python = ">=3.10"
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Operating System :: MacOS",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Swift",
+authors = [
+    {name = "Jagtesh Chadha"},
 ]
+keywords = ["compression", "time-series", "gorilla", "tsz", "swift", "lossless"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Swift",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/jagtesh/gorilla-tsz-swift"
+Repository = "https://github.com/jagtesh/gorilla-tsz-swift"
+Issues = "https://github.com/jagtesh/gorilla-tsz-swift/issues"
 
 [tool.setuptools.packages.find]
 include = ["pygorilla*"]
