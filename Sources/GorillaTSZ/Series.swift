@@ -2,13 +2,15 @@ import Foundation
 
 /// A compressed time series using Facebook's Gorilla TSZ algorithm.
 ///
-/// Port of `Series` from `dgryski/go-tsz`.
+/// Extended from the original paper to support **Int64 timestamps** (nanosecond-precision)
+/// and **Float64 values**. Port of `Series` from `dgryski/go-tsz`, widened for high-resolution
+/// time-series data.
 ///
 /// Usage:
 /// ```swift
-/// var series = Series(t0: startTimestamp)
-/// series.push(t: 1000, v: 42.5)
-/// series.push(t: 1060, v: 43.1)
+/// var series = Series(t0: startTimestampNs)
+/// series.push(t: 1704067200_000_000_000, v: 42.5)
+/// series.push(t: 1704067200_060_000_000, v: 43.1)
 /// series.finish()
 /// let compressed = series.bytes
 /// ```
@@ -17,9 +19,9 @@ import Foundation
 public struct Series: Sendable {
 
     /// Block header timestamp.
-    public let t0: UInt32
+    public let t0: Int64
 
-    private var t: UInt32 = 0
+    private var t: Int64 = 0
     private var val: Float64 = 0
 
     private var bw: BitStream
@@ -27,17 +29,17 @@ public struct Series: Sendable {
     private var trailing: UInt8 = 0
     private var finished: Bool = false
 
-    private var tDelta: UInt32 = 0
+    private var tDelta: Int64 = 0
 
     // MARK: - Init
 
     /// Create a new series with block header timestamp `t0`.
-    public init(t0: UInt32) {
+    public init(t0: Int64) {
         self.t0 = t0
         self.bw = BitStream(capacity: 128)
 
-        // Write block header
-        bw.writeBits(UInt64(t0), 32)
+        // Write block header (64-bit timestamp)
+        bw.writeBits(UInt64(bitPattern: t0), 64)
     }
 
     // MARK: - Bytes
@@ -48,7 +50,7 @@ public struct Series: Sendable {
     // MARK: - Push
 
     /// Push a data point (timestamp, value) into the series.
-    public mutating func push(t: UInt32, v: Float64) {
+    public mutating func push(t: Int64, v: Float64) {
         precondition(!finished, "Cannot push to a finished series")
 
         if self.t == 0 {
@@ -56,29 +58,29 @@ public struct Series: Sendable {
             self.t = t
             self.val = v
             self.tDelta = t &- t0
-            bw.writeBits(UInt64(tDelta), 14)
+            bw.writeBits(UInt64(bitPattern: tDelta), 64)
             bw.writeBits(v.bitPattern, 64)
             return
         }
 
         let tDelta = t &- self.t
-        let dod = Int32(bitPattern: tDelta &- self.tDelta)
+        let dod = tDelta &- self.tDelta
 
         switch dod {
         case 0:
             bw.writeBit(false)  // '0'
         case -63...64:
             bw.writeBits(0x02, 2)  // '10'
-            bw.writeBits(UInt64(bitPattern: Int64(dod)), 7)
+            bw.writeBits(UInt64(bitPattern: dod), 7)
         case -255...256:
             bw.writeBits(0x06, 3)  // '110'
-            bw.writeBits(UInt64(bitPattern: Int64(dod)), 9)
+            bw.writeBits(UInt64(bitPattern: dod), 9)
         case -2047...2048:
             bw.writeBits(0x0e, 4)  // '1110'
-            bw.writeBits(UInt64(bitPattern: Int64(dod)), 12)
+            bw.writeBits(UInt64(bitPattern: dod), 12)
         default:
             bw.writeBits(0x0f, 4)  // '1111'
-            bw.writeBits(UInt64(bitPattern: Int64(dod)), 32)
+            bw.writeBits(UInt64(bitPattern: dod), 64)
         }
 
         // Value encoding: XOR with previous
@@ -126,8 +128,8 @@ public struct Series: Sendable {
 
     /// Write the end-of-stream marker to a bitstream.
     static func writeFinishMarker(_ bw: inout BitStream) {
-        bw.writeBits(0x0f, 4)
-        bw.writeBits(0xFFFFFFFF, 32)
+        bw.writeBits(0x0f, 4)                   // '1111' prefix
+        bw.writeBits(0xFFFFFFFF_FFFFFFFF, 64)    // 64-bit sentinel
         bw.writeBit(false)
     }
 }
@@ -136,7 +138,8 @@ public struct Series: Sendable {
 
 /// Iterator for decompressing a Gorilla TSZ series.
 ///
-/// Port of `Iter` from `dgryski/go-tsz`.
+/// Extended to support **Int64 timestamps** for nanosecond-precision data.
+/// Port of `Iter` from `dgryski/go-tsz`, widened for high-resolution time-series.
 ///
 /// Usage:
 /// ```swift
@@ -149,16 +152,16 @@ public struct Series: Sendable {
 public struct Iterator {
 
     /// Block header timestamp.
-    public let t0: UInt32
+    public let t0: Int64
 
-    private var t: UInt32 = 0
+    private var t: Int64 = 0
     private var val: Float64 = 0
 
     private var br: BitStream
     private var leading: UInt8 = 0
     private var trailing: UInt8 = 0
     private var finished: Bool = false
-    private var tDelta: UInt32 = 0
+    private var tDelta: Int64 = 0
     private var _error: Bool = false
 
     // MARK: - Init
@@ -166,8 +169,8 @@ public struct Iterator {
     /// Create an iterator from compressed bytes.
     public init?(bytes: [UInt8]) {
         var bs = BitStream(bytes: bytes)
-        guard let t0raw = bs.readBits(32) else { return nil }
-        self.t0 = UInt32(t0raw)
+        guard let t0raw = bs.readBits(64) else { return nil }
+        self.t0 = Int64(bitPattern: t0raw)
         self.br = bs
     }
 
@@ -180,8 +183,8 @@ public struct Iterator {
 
         if t == 0 {
             // Read first data point
-            guard let tDeltaRaw = br.readBits(14) else { _error = true; return false }
-            tDelta = UInt32(tDeltaRaw)
+            guard let tDeltaRaw = br.readBits(64) else { _error = true; return false }
+            tDelta = Int64(bitPattern: tDeltaRaw)
             t = t0 &+ tDelta
 
             guard let vRaw = br.readBits(64) else { _error = true; return false }
@@ -198,7 +201,7 @@ public struct Iterator {
             d |= 1
         }
 
-        var dod: Int32 = 0
+        var dod: Int64 = 0
         var sz: Int = 0
 
         switch d {
@@ -212,13 +215,13 @@ public struct Iterator {
         case 0x0e:
             sz = 12
         case 0x0f:
-            guard let bits = br.readBits(32) else { _error = true; return false }
+            guard let bits = br.readBits(64) else { _error = true; return false }
             // End-of-stream marker
-            if bits == 0xFFFFFFFF {
+            if bits == 0xFFFFFFFF_FFFFFFFF {
                 finished = true
                 return false
             }
-            dod = Int32(bitPattern: UInt32(bits))
+            dod = Int64(bitPattern: bits)
         default:
             _error = true
             return false
@@ -228,13 +231,13 @@ public struct Iterator {
             guard let bits = br.readBits(sz) else { _error = true; return false }
             if bits > (1 << (sz - 1)) {
                 // Sign-extend: negative value
-                dod = Int32(bitPattern: UInt32(bits) &- UInt32(1 << sz))
+                dod = Int64(bitPattern: UInt64(bits) &- UInt64(1 << sz))
             } else {
-                dod = Int32(bits)
+                dod = Int64(bits)
             }
         }
 
-        tDelta = tDelta &+ UInt32(bitPattern: dod)
+        tDelta = tDelta &+ dod
         t = t &+ tDelta
 
         // Read compressed value
@@ -267,7 +270,7 @@ public struct Iterator {
     }
 
     /// Current timestamp and value.
-    public func values() -> (timestamp: UInt32, value: Float64) {
+    public func values() -> (timestamp: Int64, value: Float64) {
         return (t, val)
     }
 

@@ -15,8 +15,8 @@ import GorillaTSZ
 /// Compress a time series into Gorilla TSZ format.
 ///
 /// - Parameters:
-///   - t0: Block header timestamp (epoch seconds)
-///   - timestamps: List of timestamps (epoch seconds)
+///   - t0: Block header timestamp (Int64)
+///   - timestamps: List of timestamps (Int64)
 ///   - values: List of Float64 values
 /// - Returns: Compressed bytes as a list of integers (0-255)
 @PyFunction
@@ -26,9 +26,9 @@ func compress(t0: Int, timestamps: [Int], values: [Double]) throws -> [Int] {
             "timestamps has \(timestamps.count) elements but values has \(values.count)")
     }
 
-    var series = Series(t0: UInt32(t0))
+    var series = Series(t0: Int64(t0))
     for (t, v) in zip(timestamps, values) {
-        series.push(t: UInt32(t), v: v)
+        series.push(t: Int64(t), v: v)
     }
     series.finish()
 
@@ -67,13 +67,13 @@ func compression_stats(t0: Int, timestamps: [Int], values: [Double]) throws -> [
             "timestamps has \(timestamps.count) elements but values has \(values.count)")
     }
 
-    var series = Series(t0: UInt32(t0))
+    var series = Series(t0: Int64(t0))
     for (t, v) in zip(timestamps, values) {
-        series.push(t: UInt32(t), v: v)
+        series.push(t: Int64(t), v: v)
     }
     series.finish()
 
-    let rawBytes = Double(timestamps.count * 12)
+    let rawBytes = Double(timestamps.count * 16)  // 8 bytes timestamp + 8 bytes value
     let compressedBytes = Double(series.bytes.count)
 
     return [

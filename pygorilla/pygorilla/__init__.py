@@ -46,7 +46,7 @@ def _load_native():
         )
 
     spec = importlib.util.spec_from_file_location(
-        "pygorilla._ext.pygorilla", so_path)
+        "pygorilla._native.pygorilla", so_path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

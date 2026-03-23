@@ -7,7 +7,7 @@ let package = Package(
         .library(name: "Pygorilla", type: .dynamic, targets: ["Pygorilla"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/jagtesh/ApplePy.git", from: "0.1.0"),
+        .package(url: "https://github.com/jagtesh/ApplePy.git", branch: "main"),
         .package(path: "../../"),  // parent GorillaTSZ package
     ],
     targets: [

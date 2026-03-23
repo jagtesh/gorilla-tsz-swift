@@ -38,3 +38,6 @@ Issues = "https://github.com/jagtesh/gorilla-tsz-swift/issues"
 
 [tool.setuptools.packages.find]
 include = ["pygorilla*"]
+
+[tool.setuptools.package-data]
+pygorilla = ["*.so"]

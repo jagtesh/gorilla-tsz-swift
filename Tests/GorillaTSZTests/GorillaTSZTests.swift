@@ -4,7 +4,7 @@ import XCTest
 /// Port of go-tsz test data: 120 data points, one per 60s, from the Gorilla paper.
 struct TestPoint {
     let v: Float64
-    let t: UInt32
+    let t: Int64
 }
 
 let twoHoursData: [TestPoint] = [
@@ -41,8 +41,7 @@ final class GorillaTSZTests: XCTestCase {
     // MARK: - TestExampleEncoding (from paper)
 
     func testExampleEncoding() {
-        // Example from the Gorilla paper with extra edge cases
-        let t0: UInt32 = 1427162400  // Mar 24 2015 02:00:00 (arbitrary)
+        let t0: Int64 = 1427162400
         var s = Series(t0: t0)
         var tunix = t0
 
@@ -50,11 +49,9 @@ final class GorillaTSZTests: XCTestCase {
         tunix += 60;  s.push(t: tunix, v: 12)
         tunix += 60;  s.push(t: tunix, v: 24)
 
-        // Extra tests from go-tsz
-        tunix += 60;  s.push(t: tunix, v: 13)  // floating point masking/shifting
+        tunix += 60;  s.push(t: tunix, v: 13)
         tunix += 60;  s.push(t: tunix, v: 24)
 
-        // Delta-of-delta sizes
         tunix += 300; s.push(t: tunix, v: 24)   // dod = 240
         tunix += 900; s.push(t: tunix, v: 24)   // dod = 600
         tunix += 900 + 2050; s.push(t: tunix, v: 24)  // dod = 2050
@@ -62,7 +59,7 @@ final class GorillaTSZTests: XCTestCase {
         s.finish()
 
         var iter = Iterator(bytes: s.bytes)!
-        let want: [(t: UInt32, v: Float64)] = [
+        let want: [(t: Int64, v: Float64)] = [
             (t0 + 62,  12),
             (t0 + 122, 12),
             (t0 + 182, 24),
@@ -108,9 +105,9 @@ final class GorillaTSZTests: XCTestCase {
     // MARK: - TestEncodeSimilarFloats
 
     func testEncodeSimilarFloats() {
-        let tunix: UInt32 = 0
+        let tunix: Int64 = 0
         var s = Series(t0: tunix)
-        let want: [(t: UInt32, v: Float64)] = [
+        let want: [(t: Int64, v: Float64)] = [
             (tunix,     6.00065e+06),
             (tunix + 1, 6.000656e+06),
             (tunix + 2, 6.000657e+06),
@@ -151,7 +148,7 @@ final class GorillaTSZTests: XCTestCase {
         }
         s.finish()
 
-        let rawSize = twoHoursData.count * 12  // 4 bytes timestamp + 8 bytes value
+        let rawSize = twoHoursData.count * 16  // 8 bytes timestamp + 8 bytes value
         let compressedSize = s.bytes.count
         let ratio = Double(rawSize) / Double(compressedSize)
 
@@ -159,18 +156,14 @@ final class GorillaTSZTests: XCTestCase {
         XCTAssertGreaterThan(ratio, 1.0, "Compression should save space")
     }
 
-    // MARK: - TestRoundtripWithoutFinish (via Iter on unfinished series)
+    // MARK: - TestRoundtripWithoutFinish
 
     func testRoundtripWithoutFinish() {
-        // Test that iterating over an unfinished series still works
-        // (go-tsz's Series.Iter() clones the stream and writes finish marker)
         var s = Series(t0: twoHoursData[0].t)
         for p in twoHoursData {
             s.push(t: p.t, v: p.v)
         }
 
-        // Create iterator from current bytes — without calling finish
-        // We need to manually append the finish marker to a clone
         var clone = s
         clone.finish()
 
@@ -204,21 +197,20 @@ final class GorillaTSZTests: XCTestCase {
 
     func testIdenticalValues() {
         var s = Series(t0: 0)
-        for i: UInt32 in 1...100 {
+        for i: Int64 in 1...100 {
             s.push(t: i * 60, v: 777.0)
         }
         s.finish()
 
-        let rawSize = 100 * 12
+        let rawSize = 100 * 16
         let compressedSize = s.bytes.count
         let ratio = Double(rawSize) / Double(compressedSize)
         print("Identical values: Raw: \(rawSize) bytes, Compressed: \(compressedSize) bytes, Ratio: \(String(format: "%.1f", ratio))x")
 
-        // Identical values with constant interval should compress extremely well
         XCTAssertGreaterThan(ratio, 5.0, "Identical values should get >5x compression")
 
         var iter = Iterator(bytes: s.bytes)!
-        for i: UInt32 in 1...100 {
+        for i: Int64 in 1...100 {
             XCTAssertTrue(iter.next())
             let (t, v) = iter.values()
             XCTAssertEqual(t, i * 60)
@@ -231,7 +223,7 @@ final class GorillaTSZTests: XCTestCase {
 
     func testLargeTimestampJumps() {
         var s = Series(t0: 0)
-        let timestamps: [UInt32] = [60, 120, 180, 86400, 86460, 86520]  // jump from 180s to 86400s (1 day)
+        let timestamps: [Int64] = [60, 120, 180, 86400, 86460, 86520]
         let values: [Float64] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
 
         for (t, v) in zip(timestamps, values) {
@@ -253,13 +245,13 @@ final class GorillaTSZTests: XCTestCase {
 
     func testZeroValues() {
         var s = Series(t0: 0)
-        for i: UInt32 in 1...10 {
+        for i: Int64 in 1...10 {
             s.push(t: i * 60, v: 0.0)
         }
         s.finish()
 
         var iter = Iterator(bytes: s.bytes)!
-        for i: UInt32 in 1...10 {
+        for i: Int64 in 1...10 {
             XCTAssertTrue(iter.next())
             let (t, v) = iter.values()
             XCTAssertEqual(t, i * 60)
@@ -274,7 +266,7 @@ final class GorillaTSZTests: XCTestCase {
         var s = Series(t0: 0)
         let values: [Float64] = [-1.5, -100.0, 0.0, 100.0, -0.001, .infinity, -.infinity]
         for (i, v) in values.enumerated() {
-            s.push(t: UInt32(i + 1) * 60, v: v)
+            s.push(t: Int64(i + 1) * 60, v: v)
         }
         s.finish()
 
@@ -282,8 +274,72 @@ final class GorillaTSZTests: XCTestCase {
         for (i, v) in values.enumerated() {
             XCTAssertTrue(iter.next())
             let (tt, vv) = iter.values()
-            XCTAssertEqual(tt, UInt32(i + 1) * 60)
+            XCTAssertEqual(tt, Int64(i + 1) * 60)
             XCTAssertEqual(vv, v)
+        }
+        XCTAssertFalse(iter.next())
+    }
+
+    // MARK: - TestNanosecondTimestamps (NEW)
+
+    func testNanosecondTimestamps() {
+        // Simulate PackedTick-style nanosecond timestamps
+        let t0: Int64 = 1_704_067_200_000_000_000  // 2024-01-01 00:00:00 UTC in nanoseconds
+        let interval: Int64 = 60_000_000_000         // 60 seconds in nanoseconds
+
+        var s = Series(t0: t0)
+        var timestamps: [Int64] = []
+        var values: [Float64] = []
+
+        for i in 1...120 {
+            let t = t0 + Int64(i) * interval
+            let v = 19000.0 + Double(i) * 0.25  // NQ futures-like prices
+            timestamps.append(t)
+            values.append(v)
+            s.push(t: t, v: v)
+        }
+        s.finish()
+
+        let rawSize = 120 * 16  // 8 bytes ts + 8 bytes value
+        let compressedSize = s.bytes.count
+        let ratio = Double(rawSize) / Double(compressedSize)
+        print("Nanosecond timestamps: Raw: \(rawSize) bytes, Compressed: \(compressedSize) bytes, Ratio: \(String(format: "%.1f", ratio))x")
+        XCTAssertGreaterThan(ratio, 3.0, "Nanosecond data should still compress well")
+
+        // Verify lossless roundtrip
+        var iter = Iterator(bytes: s.bytes)!
+        for (i, (t, v)) in zip(timestamps, values).enumerated() {
+            XCTAssertTrue(iter.next(), "Next()=false at index \(i)")
+            let (tt, vv) = iter.values()
+            XCTAssertEqual(tt, t, "Nanosecond timestamp mismatch at index \(i)")
+            XCTAssertEqual(vv, v, "Value mismatch at index \(i)")
+        }
+        XCTAssertFalse(iter.next())
+        XCTAssertFalse(iter.hasError)
+    }
+
+    // MARK: - TestInt64PriceLikeValues (NEW)
+
+    func testInt64PriceLikeValues() {
+        // Test using reinterpret-cast of Int64 prices as Float64 bit patterns
+        // This verifies the XOR compression works for non-Float64 data
+        let t0: Int64 = 0
+        var s = Series(t0: t0)
+
+        // Simulate Int64 tick prices via bitPattern reinterpret
+        let prices: [Int64] = [76100, 72700, 76500, 70600, 70000, 67900, 75700, 70800, 73900, 70700]
+        for (i, px) in prices.enumerated() {
+            let t = Int64(i + 1) * 1_000_000_000  // 1-second intervals in ns
+            s.push(t: t, v: Float64(bitPattern: UInt64(bitPattern: px)))
+        }
+        s.finish()
+
+        var iter = Iterator(bytes: s.bytes)!
+        for (i, px) in prices.enumerated() {
+            XCTAssertTrue(iter.next())
+            let (tt, vv) = iter.values()
+            XCTAssertEqual(tt, Int64(i + 1) * 1_000_000_000)
+            XCTAssertEqual(Int64(bitPattern: vv.bitPattern), px, "Price roundtrip mismatch at index \(i)")
         }
         XCTAssertFalse(iter.next())
     }
